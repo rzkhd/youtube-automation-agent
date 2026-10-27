@@ -326,7 +326,7 @@ class ProductionManagementAgent {
         visualAssets: visualAssets,
         duration: productionData.estimatedDuration,
         format: 'mp4',
-        resolution: '1920x1080',
+        resolution: process.env.VIDEO_ASPECT_RATIO === '9:16' ? '1080x1920' : '1920x1080',
         fps: 30,
         generatedWith: 'AI'
       };
@@ -671,22 +671,26 @@ class ProductionManagementAgent {
   // Helper method to create visual prompts from script content
   createVisualPromptsFromScript(script) {
     const prompts = [];
+    const storybookDirection = 'children storybook illustration, handmade origami paper characters, preserve consistent character colors and facial features, soft pastel palette, uncluttered background, gentle expression, vertical composition, no text, no letters, no watermark';
     
     // Title prompt
-    prompts.push(`${script.title}, clear visual storytelling`);
+    prompts.push(`${script.title}. Opening storybook cover scene. ${storybookDirection}`);
     
     // Content-based prompts
     if (script.mainContent && script.mainContent.sections) {
       script.mainContent.sections.forEach(section => {
         if (section.title) {
-          prompts.push(`${section.title}, relevant explanatory visual`);
+          const narration = Array.isArray(section.content)
+            ? section.content.join(' ')
+            : section.content || (section.items || section.steps || []).map(item => `${item.title || ''} ${item.description || ''}`).join(' ');
+          prompts.push(`${section.title}. ${narration}. Illustrate this exact story moment. ${storybookDirection}`);
         }
       });
     }
     
     // Ensure we have at least 3 prompts
     while (prompts.length < 3) {
-      prompts.push(`${script.title || 'Video topic'}, supporting explanatory visual`);
+      prompts.push(`${script.title || 'Video topic'}. Supporting storybook scene. ${storybookDirection}`);
     }
     
     return prompts.slice(0, 5); // Limit to 5 for cost control

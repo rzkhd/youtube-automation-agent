@@ -387,7 +387,8 @@ class SceneRepairService {
     if (!scene) throw this.error('Scene not found', 404);
     const settings = await this.mediaGeneration?.settings?.() || { provider: 'slideshow', order: [], clipDuration: scene.duration };
     const requestedProvider = input.provider || (scene.provider && scene.provider !== 'image-provider' ? scene.provider : settings.provider);
-    const provider = this.mediaGeneration?.registry?.select(requestedProvider, settings.order, { duration: Math.min(scene.duration, settings.clipDuration || scene.duration) });
+    const firstFrame = scene.assetType === 'image' ? scene.assetPath : null;
+    const provider = this.mediaGeneration?.registry?.select(requestedProvider, settings.order, { duration: Math.min(scene.duration, settings.clipDuration || scene.duration), firstFrame });
     const paid = Boolean(provider && provider.id !== 'slideshow');
     const generatedSeconds = paid ? provider.normalizeRequest({ duration: Math.min(scene.duration, settings.clipDuration || scene.duration) }).duration : 0;
     return {
@@ -415,7 +416,8 @@ class SceneRepairService {
         const settings = await this.mediaGeneration.settings();
         const request = provider.normalizeRequest({
           prompt: scene.prompt, duration: estimate.generatedSeconds, resolution: settings.resolution,
-          aspectRatio: settings.aspectRatio, generateAudio: false, referenceImages: []
+          aspectRatio: settings.aspectRatio, generateAudio: false,
+          firstFrame: scene.assetType === 'image' ? scene.assetPath : null, referenceImages: []
         });
         const outputPath = path.join(this.dataRoot, 'videos', 'scenes', `${productionId}_${scene.id}_r${scene.revision + 1}.mp4`);
         await fs.mkdir(path.dirname(outputPath), { recursive: true });

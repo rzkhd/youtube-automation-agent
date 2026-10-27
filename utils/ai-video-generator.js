@@ -309,11 +309,12 @@ class AIVideoGenerator {
   }
 
   async generateOpenAIImage(prompt, imagePath) {
+    const aspectRatio = process.env.VIDEO_ASPECT_RATIO || '16:9';
     const response = await this.openai.images.generate({
       model: OPENAI_IMAGE_MODEL,
       prompt: prompt,
       n: 1,
-      size: "1536x1024",
+      size: aspectRatio === '9:16' ? '1024x1536' : '1536x1024',
       quality: "high",
     });
 
@@ -336,7 +337,7 @@ class AIVideoGenerator {
       config: {
         responseModalities: ['IMAGE'],
         imageConfig: {
-          aspectRatio: '16:9',
+          aspectRatio: process.env.VIDEO_ASPECT_RATIO || '16:9',
           imageSize: '1K'
         }
       }
@@ -381,7 +382,7 @@ class AIVideoGenerator {
 
     const normalizedStyle = String(style || '').trim().toLowerCase();
     const enhancement = styleEnhancements[normalizedStyle] || String(style || '').trim() || styleEnhancements.ethereal;
-    return `${prompt}, ${enhancement}, high quality, 16:9 aspect ratio, digital art`;
+    return `${prompt}, ${enhancement}, high quality, ${process.env.VIDEO_ASPECT_RATIO || '16:9'} aspect ratio, digital art`;
   }
 
   async downloadImage(url, outputPath) {
@@ -559,8 +560,9 @@ class AIVideoGenerator {
     const slidesDir = path.join(path.dirname(outputPath), 'slides');
 
     try {
+      const dimensions = this.videoDimensions();
       const page = await browser.newPage();
-      await page.setViewportSize({ width: 1920, height: 1080 });
+      await page.setViewportSize(dimensions);
 
       // Create HTML for slideshow (only real image files can be embedded)
       const imageAssets = await this.filterImageAssets(visualAssets);
@@ -625,19 +627,24 @@ class AIVideoGenerator {
       args.push('-loop', '1', '-t', perSlide.toFixed(2), '-framerate', '30', '-i', still);
     }
 
+    const { width, height } = this.videoDimensions();
+    const frames = Math.ceil(perSlide * 30);
+    const motion = `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},zoompan=z='min(zoom+0.0008,1.08)':d=${frames}:s=${width}x${height}:fps=30`;
+
     if (stills.length === 1) {
-      args.push('-vf', 'format=yuv420p', '-c:v', 'libx264', videoPath);
+      args.push('-vf', `${motion},format=yuv420p`, '-c:v', 'libx264', videoPath);
       await runFFmpeg(args);
       return videoPath;
     }
 
     // Chain crossfades: transition k starts fade seconds before slide k ends
     const filters = [];
-    let prev = '[0:v]';
+    for (let i = 0; i < stills.length; i++) filters.push(`[${i}:v]${motion}[s${i}]`);
+    let prev = '[s0]';
     for (let i = 1; i < stills.length; i++) {
       const out = `[v${i}]`;
       const offset = (i * (perSlide - fade)).toFixed(2);
-      filters.push(`${prev}[${i}:v]xfade=transition=fade:duration=${fade}:offset=${offset}${out}`);
+      filters.push(`${prev}[s${i}]xfade=transition=fade:duration=${fade}:offset=${offset}${out}`);
       prev = out;
     }
     filters.push(`${prev}format=yuv420p[vfinal]`);
@@ -683,6 +690,12 @@ class AIVideoGenerator {
     return images;
   }
 
+  videoDimensions() {
+    return process.env.VIDEO_ASPECT_RATIO === '9:16'
+      ? { width: 1080, height: 1920 }
+      : { width: 1920, height: 1080 };
+  }
+
   createSlideshowHTML(script, visualAssets) {
     return `
 <!DOCTYPE html>
@@ -692,10 +705,10 @@ class AIVideoGenerator {
         body {
             margin: 0;
             padding: 0;
-            width: 1920px;
-            height: 1080px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            font-family: 'Arial', sans-serif;
+            width: ${this.videoDimensions().width}px;
+            height: ${this.videoDimensions().height}px;
+            background: #efe3cb;
+            font-family: Georgia, 'Times New Roman', serif;
             overflow: hidden;
         }
         
@@ -708,6 +721,8 @@ class AIVideoGenerator {
             justify-content: center;
             opacity: 0;
             transition: opacity 2s ease-in-out;
+            background: #fffaf0;
+            box-shadow: inset 0 0 70px rgba(92, 61, 35, 0.18);
         }
         
         .slide.active {
@@ -719,25 +734,30 @@ class AIVideoGenerator {
             z-index: 2;
             text-align: center;
             color: white;
-            max-width: 80%;
+            max-width: 82%;
+            background: rgba(255, 250, 240, 0.88);
+            border: 3px solid rgba(121, 82, 46, 0.3);
+            border-radius: 28px;
+            padding: 28px 36px;
+            color: #3f3025;
         }
         
         h1 {
             font-size: 72px;
             margin-bottom: 30px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            text-shadow: none;
         }
         
         h2 {
             font-size: 48px;
             margin-bottom: 20px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            text-shadow: none;
         }
         
         p {
             font-size: 36px;
             line-height: 1.4;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            text-shadow: none;
         }
         
         .background-image {
@@ -757,7 +777,7 @@ class AIVideoGenerator {
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.6) 100%);
+            background: linear-gradient(180deg, rgba(255,250,240,0.02) 50%, rgba(54,35,22,0.3) 100%);
             z-index: 1;
         }
 
@@ -800,8 +820,8 @@ class AIVideoGenerator {
     <!-- Subscribe Slide -->
     <div class="slide">
         <div class="content">
-            <h2>Thanks for watching</h2>
-            <p>Subscribe for more videos like this</p>
+            <h2>The End</h2>
+            <p>Another Nanorigami story is waiting.</p>
         </div>
     </div>
     

@@ -1257,11 +1257,14 @@ class SystemTest {
       };
       let useSlideshow = false;
       let regeneratedVisualStyle = null;
+      let selectedRequest;
+      let generatedRequest;
       const fakeGenerator = {
         mediaGeneration: {
           settings: async () => ({ provider: 'seedance', order: ['seedance'], clipDuration: 4, resolution: '720p', aspectRatio: '16:9' }),
-          registry: { select: () => useSlideshow ? { id: 'slideshow' } : fakeProvider, get: () => fakeProvider },
-          generateClip: async ({ outputPath }) => {
+          registry: { select: (_provider, _order, request) => { selectedRequest = request; return useSlideshow ? { id: 'slideshow' } : fakeProvider; }, get: () => fakeProvider },
+          generateClip: async ({ outputPath, request }) => {
+            generatedRequest = request;
             await fs.mkdir(path.dirname(outputPath), { recursive: true });
             await fs.writeFile(outputPath, Buffer.from('generated scene video'));
             return { outputPath, task: { model: fakeProvider.model, external_task_id: 'scene-task-1' } };
@@ -1306,6 +1309,9 @@ class SystemTest {
       }
       if (!paidBlocked) throw new Error('Paid scene regeneration started without explicit confirmation');
       const regenerated = await service.regenerate(production.id, first.id, { confirmPaid: true, regenerateNarration: true });
+      if (selectedRequest.firstFrame !== first.assetPath || generatedRequest.firstFrame !== first.assetPath) {
+        throw new Error('Image scene regeneration did not use the current asset as its first frame');
+      }
       if (
         regenerated.scene.status !== 'needs_rebuild' || regenerated.scene.externalTaskId !== 'scene-task-1' ||
         regenerated.scene.narrationStatus !== 'current' || regenerated.scene.narrationProvider !== 'fixture-tts' ||
@@ -1923,6 +1929,13 @@ class SystemTest {
     }
     if (/\.background-image\s*\{[^}]*opacity:\s*0?\.\d/.test(html)) {
       throw new Error('Generated slideshow images are still washed out behind the gradient');
+    }
+    const storyPrompts = ProductionManagementAgent.prototype.createVisualPromptsFromScript({
+      title: 'The Blue Rabbit',
+      mainContent: { sections: [{ title: 'A kind hello', content: ['The blue rabbit shares a paper star.'] }] }
+    });
+    if (!storyPrompts[1].includes('The blue rabbit shares a paper star.')) {
+      throw new Error('Storybook image prompts did not include the scene narration');
     }
 
     // Discussion #31: a simulated AI thumbnail must not replace the designer's real
@@ -2993,7 +3006,7 @@ class SystemTest {
       }
       if (
         imageRequest?.config?.responseModalities?.[0] !== 'IMAGE' ||
-        imageRequest?.config?.imageConfig?.aspectRatio !== '16:9'
+        imageRequest?.config?.imageConfig?.aspectRatio !== (process.env.VIDEO_ASPECT_RATIO || '16:9')
       ) {
         throw new Error('Gemini image request did not require a widescreen image response');
       }
