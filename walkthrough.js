@@ -273,6 +273,15 @@ class SetupWalkthrough {
     this.header(2, 'Your AI provider (writes scripts, makes images & narration)');
 
     if (this.cm.hasAITextProvider()) {
+      if (process.env.OPENAI_COMPATIBLE_API_KEY && process.env.OPENAI_COMPATIBLE_BASE_URL) {
+        try {
+          const service = new AITextService({});
+          await service.generateText('Reply with the single word OK.', { maxTokens: 32, temperature: 0 });
+          console.log(chalk.green(`  ✓ OpenAI-compatible text connected (${service.model})`));
+        } catch (error) {
+          console.log(chalk.red(`  ✗ OpenAI-compatible text failed: ${error.message}`));
+        }
+      }
       const { redo } = await inquirer.prompt([{
         type: 'confirm',
         name: 'redo',
@@ -573,7 +582,7 @@ class SetupWalkthrough {
 
     const rows = [
       { ok: hasText, name: 'Write scripts & pick topics', fix: 'step 2 (AI provider)' },
-      { ok: hasMedia, name: 'Generate images & voice narration', fix: 'step 2 — use a Gemini or OpenAI key' },
+      { ok: hasMedia, name: 'Generate images & voice narration', fix: 'optional — OpenAI-compatible text endpoints do not provide media; use a Gemini or OpenAI key' },
       { ok: hasFFmpeg, name: 'Assemble real .mp4 videos', fix: ffmpegInstallHint() },
       { ok: hasVideoProvider, name: 'Generate AI video clips', fix: 'step 3 — or keep the local slideshow provider' },
       { ok: hasUpload, name: 'Upload to YouTube', fix: 'step 4 (YouTube connection)' }

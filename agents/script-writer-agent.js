@@ -124,7 +124,7 @@ Topic: ${strategy.topic}
 Style/content type: ${strategy.contentType}
 Angle: ${strategy.angle}
 Target audience: ${strategy.targetAudience}
-Desired length: ${strategy.requestedLength || process.env.DEFAULT_VIDEO_LENGTH || '8-12 minutes'}
+Desired length: ${strategy.requestedLength === 'short' ? '45-60 seconds, maximum 130 spoken words' : strategy.requestedLength || process.env.DEFAULT_VIDEO_LENGTH || '8-12 minutes'}
 Tone: ${template.tone}
 Pacing: ${template.pacing}
 Brand voice: ${strategy.brandVoice || 'clear, credible, and engaging'}

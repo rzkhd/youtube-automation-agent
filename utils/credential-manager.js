@@ -588,7 +588,9 @@ class CredentialManager {
 
     // Environment-variable based configuration (see utils/ai-text-service.js)
     const envKeys = [...Object.values(PROVIDERS).map(p => p.envKey), 'GEMINI_API_KEY'];
-    return envKeys.some(key => process.env[key]);
+    return envKeys.some(key => process.env[key]) || Boolean(
+      process.env.OPENAI_COMPATIBLE_API_KEY && process.env.OPENAI_COMPATIBLE_BASE_URL
+    );
   }
 
   getMissingCredentials() {

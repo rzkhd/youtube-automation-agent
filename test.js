@@ -2641,7 +2641,7 @@ class SystemTest {
     const manager = new CredentialManager();
 
     // Isolate the test from any API keys set in the environment
-    const envKeys = [...Object.values(PROVIDERS).map(p => p.envKey), 'GEMINI_API_KEY', 'MINIMAX_API_KEY'];
+    const envKeys = [...Object.values(PROVIDERS).map(p => p.envKey), 'GEMINI_API_KEY', 'MINIMAX_API_KEY', 'OPENAI_COMPATIBLE_API_KEY', 'OPENAI_COMPATIBLE_BASE_URL', 'OPENAI_COMPATIBLE_MODEL'];
     const savedEnv = {};
     for (const key of envKeys) {
       savedEnv[key] = process.env[key];
@@ -2704,8 +2704,20 @@ class SystemTest {
     const { AITextService } = require('./utils/ai-text-service');
 
     const savedEnv = process.env.OPENAI_API_KEY;
+    const savedCompatibleKey = process.env.OPENAI_COMPATIBLE_API_KEY;
+    const savedBaseURL = process.env.OPENAI_COMPATIBLE_BASE_URL;
+    const savedModel = process.env.OPENAI_COMPATIBLE_MODEL;
     delete process.env.OPENAI_API_KEY;
     try {
+      process.env.OPENAI_COMPATIBLE_API_KEY = 'test-key';
+      process.env.OPENAI_COMPATIBLE_BASE_URL = 'https://openai-compatible.example/v1';
+      process.env.OPENAI_COMPATIBLE_MODEL = 'custom-model';
+      const customService = new AITextService({});
+      if (customService.client.baseURL !== process.env.OPENAI_COMPATIBLE_BASE_URL || customService.model !== process.env.OPENAI_COMPATIBLE_MODEL) {
+        throw new Error('OpenAI-compatible endpoint overrides were not applied');
+      }
+      delete process.env.OPENAI_COMPATIBLE_API_KEY;
+
       const service = new AITextService({
         aiProvider: { provider: 'openai', apiKey: 'test-key', model: 'gpt-6.1-sol' }
       });
@@ -2830,6 +2842,12 @@ class SystemTest {
     } finally {
       if (savedEnv === undefined) delete process.env.OPENAI_API_KEY;
       else process.env.OPENAI_API_KEY = savedEnv;
+      if (savedCompatibleKey === undefined) delete process.env.OPENAI_COMPATIBLE_API_KEY;
+      else process.env.OPENAI_COMPATIBLE_API_KEY = savedCompatibleKey;
+      if (savedBaseURL === undefined) delete process.env.OPENAI_COMPATIBLE_BASE_URL;
+      else process.env.OPENAI_COMPATIBLE_BASE_URL = savedBaseURL;
+      if (savedModel === undefined) delete process.env.OPENAI_COMPATIBLE_MODEL;
+      else process.env.OPENAI_COMPATIBLE_MODEL = savedModel;
     }
 
     this.logger.info('AI text service token parameter test completed successfully');

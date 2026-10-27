@@ -84,6 +84,14 @@ class AITextService {
       return this._initOpenAICompatible(PROVIDERS[provider], apiKey, model);
     }
 
+    if (process.env.OPENAI_COMPATIBLE_API_KEY && process.env.OPENAI_COMPATIBLE_BASE_URL) {
+      return this._initOpenAICompatible({
+        name: 'OpenAI-compatible',
+        baseURL: process.env.OPENAI_COMPATIBLE_BASE_URL,
+        defaultModel: process.env.OPENAI_COMPATIBLE_MODEL,
+      }, process.env.OPENAI_COMPATIBLE_API_KEY);
+    }
+
     for (const [, preset] of Object.entries(PROVIDERS)) {
       const key = process.env[preset.envKey];
       if (key) {
